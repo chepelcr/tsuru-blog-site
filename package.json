@@ -1,0 +1,20 @@
+{
+  "name": "tsuru-blog-site",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "build:pages": "pnpm run build && python3 scripts/prerender.py",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.21"
+  }
+}
