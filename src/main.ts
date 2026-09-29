@@ -55,7 +55,7 @@ function cover(post: BlogPost) {
 
 function card(post: BlogPost, featured = false) {
   const node = el('article', featured ? 'post-card featured' : 'post-card');
-  const url = `/${encodeURIComponent(post.slug)}/`;
+  const url = `/?post=${encodeURIComponent(post.slug)}`;
   const picture = cover(post);
   if (picture) {
     const imageLink = link('', url, 'card-image-link');
@@ -135,7 +135,7 @@ function listPage(posts: BlogPost[], chrome: BlogChrome) {
 function articlePage(post: BlogPost, chrome: BlogChrome) {
   const doc = post.revision.document;
   document.title = `${pick(doc.title)} | Tsuru`;
-  updateCanonical(`/${encodeURIComponent(post.slug)}/`);
+  updateCanonical(`/?post=${encodeURIComponent(post.slug)}`);
   const main = el('main', 'article-page');
   const lead = el('div', 'reading-column article-lead');
   lead.append(link(`← ${pick(chrome.backToBlog)}`, '/', 'back-link'),
@@ -161,7 +161,8 @@ async function render() {
   document.documentElement.lang = language;
   root.replaceChildren(header(), el('main', 'loading', language === 'es' ? 'Cargando artículos…' : 'Loading articles…'), footer());
   try {
-    const slug = decodeURIComponent(location.pathname.replace(/^\/+|\/+$/g, ''));
+    const slug = new URLSearchParams(location.search).get('post') ||
+      decodeURIComponent(location.pathname.replace(/^\/+|\/+$/g, ''));
     const chromePromise = publicApi.chrome();
     let page: HTMLElement;
     if (slug) {
