@@ -173,7 +173,7 @@ function footer() {
   const node = el('footer', 'site-footer');
   if (!footerContent) return node;
   const inner = el('div', 'frame footer-inner');
-  if (blogChrome) {
+  if (blogChrome && location.pathname.startsWith('/blog/')) {
     const back = el('div', 'footer-back');
     back.append(link(`← ${pick(blogChrome.backToBlog)}`, '/', 'back-link'));
     inner.append(back);
