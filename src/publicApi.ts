@@ -5,7 +5,9 @@ const base = (import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/+$/, '');
 const pool = import.meta.env.VITE_PUBLIC_IDENTITY_POOL_ID || '';
 const region = import.meta.env.VITE_AWS_REGION || pool.split(':')[0];
 let identityId: string | undefined;
-let credentials: { accessKeyId: string; secretAccessKey: string; sessionToken: string; expiration: number } | undefined;
+type GuestCredentials = { accessKeyId: string; secretAccessKey: string; sessionToken: string; expiration: number };
+let credentials: GuestCredentials | undefined;
+let credentialsPromise: Promise<GuestCredentials> | undefined;
 
 async function identityCall<T>(target: string, body: unknown): Promise<T> {
   const response = await fetch(`https://cognito-identity.${region}.amazonaws.com/`, {
@@ -19,12 +21,16 @@ async function identityCall<T>(target: string, body: unknown): Promise<T> {
 
 async function guest() {
   if (credentials && credentials.expiration > Date.now() + 60_000) return credentials;
-  identityId ||= (await identityCall<{ IdentityId: string }>('GetId', { IdentityPoolId: pool })).IdentityId;
-  const result = await identityCall<{ Credentials: { AccessKeyId: string; SecretKey: string; SessionToken: string; Expiration: number } }>(
-    'GetCredentialsForIdentity', { IdentityId: identityId });
-  credentials = { accessKeyId: result.Credentials.AccessKeyId, secretAccessKey: result.Credentials.SecretKey,
-    sessionToken: result.Credentials.SessionToken, expiration: result.Credentials.Expiration * 1000 };
-  return credentials;
+  credentialsPromise ||= (async () => {
+    identityId ||= (await identityCall<{ IdentityId: string }>('GetId', { IdentityPoolId: pool })).IdentityId;
+    const result = await identityCall<{ Credentials: { AccessKeyId: string; SecretKey: string; SessionToken: string; Expiration: number } }>(
+      'GetCredentialsForIdentity', { IdentityId: identityId });
+    credentials = { accessKeyId: result.Credentials.AccessKeyId, secretAccessKey: result.Credentials.SecretKey,
+      sessionToken: result.Credentials.SessionToken, expiration: result.Credentials.Expiration * 1000 };
+    return credentials;
+  })();
+  try { return await credentialsPromise; }
+  finally { credentialsPromise = undefined; }
 }
 
 async function get<T>(path: string): Promise<T> {
