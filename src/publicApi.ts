@@ -1,5 +1,5 @@
 import { AwsClient } from 'aws4fetch';
-import type { BlogChrome, BlogList, BlogPost } from './types';
+import type { BlogChrome, BlogList, BlogPost, BrandingContent, NavbarContent } from './types';
 
 const base = (import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/+$/, '');
 const pool = import.meta.env.VITE_PUBLIC_IDENTITY_POOL_ID || '';
@@ -49,6 +49,9 @@ export const publicApi = {
     }
     throw new Error('Blog listing exceeds the supported page count');
   },
-  article: (slug: string) => get<BlogPost>(`/api/public/blog/posts/${encodeURIComponent(slug)}`),
+  articleById: (id: string) => get<BlogPost>(`/api/public/blog/posts/by-id/${encodeURIComponent(id)}`),
+  legacyArticle: (slug: string) => get<BlogPost>(`/api/public/blog/posts/${encodeURIComponent(slug)}`),
   chrome: async () => (await get<{ data: BlogChrome }>('/api/public/content/landing/blog-chrome')).data,
+  navbar: async () => (await get<{ data: NavbarContent }>('/api/public/content/landing/navbar')).data,
+  branding: async () => (await get<{ data: BrandingContent }>('/api/public/content/landing/branding')).data,
 };

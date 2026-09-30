@@ -26,3 +26,17 @@ export interface BlogChrome {
   readMore: Localized;
   backToBlog: Localized;
 }
+export interface NavbarContent {
+  brand: Localized;
+  links: Record<'features' | 'plans' | 'fairs' | 'community' | 'examples' | 'nosotros' | 'about' | 'contact' | 'blog', Localized>;
+  login: Localized;
+  register: Localized;
+}
+export interface BrandingContent {
+  logoUrl: string;
+  logoUrlDark: string;
+  faviconUrl: string;
+  faviconUrlDark: string;
+  adminLoginUrl: string;
+  adminRegisterUrl: string;
+}

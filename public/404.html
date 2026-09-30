@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Tsuru Blog</title></head>
+<body>
+<script>
+  // GitHub Pages serves this file for direct article requests. The app restores
+  // the path with replaceState after the root document has loaded.
+  location.replace('/?route=' + encodeURIComponent(location.pathname + location.search + location.hash));
+</script>
+</body>
+</html>
