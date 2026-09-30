@@ -1,5 +1,5 @@
 import { publicApi, PublicApiError } from './publicApi';
-import type { BlogBlock, BlogChrome, BlogPost, BrandingContent, Lang, Localized, NavbarContent } from './types';
+import type { BlogBlock, BlogChrome, BlogPost, BrandingContent, FooterContent, Lang, Localized, NavbarContent } from './types';
 import './style.css';
 
 const root = document.getElementById('app')!;
@@ -9,6 +9,8 @@ let language: Lang = savedLanguage === 'en' || savedLanguage === 'es'
   ? savedLanguage : navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en';
 let branding: BrandingContent | undefined;
 let navbar: NavbarContent | undefined;
+let footerContent: FooterContent | undefined;
+let blogChrome: BlogChrome | undefined;
 let renderVersion = 0;
 const pick = (value: Localized) => value[language] || value.es;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) => {
@@ -86,7 +88,7 @@ function languageButton() {
   button.onclick = () => {
     language = language === 'es' ? 'en' : 'es';
     localStorage.setItem('language', language);
-    void render();
+    void render('language');
   };
   return button;
 }
@@ -101,8 +103,10 @@ function themeButton() {
   moon.classList.add('moon');
   button.append(sun, moon);
   button.onclick = () => {
+    document.body.classList.add('theme-transitioning');
     localStorage.setItem('theme', themeIsDark() ? 'light' : 'dark');
     applyTheme();
+    window.setTimeout(() => document.body.classList.remove('theme-transitioning'), 800);
   };
   return button;
 }
@@ -167,8 +171,45 @@ function header() {
 
 function footer() {
   const node = el('footer', 'site-footer');
+  if (!footerContent) return node;
   const inner = el('div', 'frame footer-inner');
-  inner.append(logo(navbar ? pick(navbar.brand) : 'Tsuru'), link(language === 'es' ? 'Volver a Tsuru' : 'Back to Tsuru', 'https://tsuru.jcampos.dev'));
+  if (blogChrome) {
+    const back = el('div', 'footer-back');
+    back.append(link(`← ${pick(blogChrome.backToBlog)}`, '/', 'back-link'));
+    inner.append(back);
+  }
+  const columns = el('div', 'footer-columns');
+  const brand = el('div', 'footer-brand');
+  brand.append(logo(pick(footerContent.brand)), el('p', '', pick(footerContent.description)));
+  columns.append(brand);
+  const groups: { name: 'product' | 'company' | 'legal'; links: [keyof FooterContent['links'], string][] }[] = [
+    { name: 'product', links: [['features', '/funcionalidades'], ['plans', '/planes'], ['fairs', '/ferias'], ['community', '/comunidad'], ['examples', '/ejemplos']] },
+    { name: 'company', links: [['about', '/quienes-somos'], ['blog', '/'], ['contact', '/contacto']] },
+    { name: 'legal', links: [['terms', '/terminos'], ['privacy', '/privacidad'], ['cookies', '/cookies']] },
+  ];
+  for (const group of groups) {
+    const column = el('div', 'footer-group');
+    column.append(el('h2', '', pick(footerContent.groups[group.name])));
+    for (const [key, path] of group.links) column.append(link(pick(footerContent.links[key]), path === '/' ? '/' : `https://tsuru.jcampos.dev${path}`));
+    columns.append(column);
+  }
+  inner.append(columns);
+  const lower = el('div', 'footer-lower');
+  lower.append(el('p', '', pick(footerContent.copyright).replace(/©\s*\d{4}/, `© ${new Date().getFullYear()}`)));
+  const studio = link('', footerContent.madeBy.url, 'footer-studio');
+  studio.target = '_blank';
+  studio.rel = 'noopener noreferrer';
+  studio.append(el('span', '', pick(footerContent.madeBy.label)));
+  if (footerContent.madeBy.logoUrl) {
+    const image = el('img');
+    image.src = new URL(footerContent.madeBy.logoUrl, 'https://tsuru.jcampos.dev').href;
+    image.alt = footerContent.madeBy.name;
+    image.loading = 'lazy';
+    studio.append(image);
+  }
+  studio.append(el('span', 'studio-name', footerContent.madeBy.name));
+  lower.append(studio);
+  inner.append(lower);
   node.append(inner);
   return node;
 }
@@ -275,9 +316,6 @@ function articlePage(post: BlogPost, chrome: BlogChrome) {
   const story = el('article', 'story reading-column');
   doc.blocks.forEach((block) => story.append(blockNode(block, post.media)));
   main.append(story);
-  const end = el('div', 'reading-column article-end');
-  end.append(link(`← ${pick(chrome.backToBlog)}`, '/', 'back-link'));
-  main.append(end);
   return main;
 }
 
@@ -287,38 +325,63 @@ function updateCanonical(path: string) {
   canonical.href = `${site}${path}`;
 }
 
-async function render() {
+async function showPage(page: HTMLElement, version: number, transition: 'none' | 'page' | 'language') {
+  const animate = transition !== 'none' && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const outgoing = transition === 'language' ? root : root.querySelector('main');
+  if (animate && outgoing) {
+    outgoing.classList.add(transition === 'language' ? 'language-transitioning' : 'page-exit');
+    await new Promise((resolve) => window.setTimeout(resolve, transition === 'language' ? 300 : 280));
+    if (version !== renderVersion) return;
+  }
+  root.classList.remove('language-transitioning');
+  root.replaceChildren(header(), page, footer());
+  root.removeAttribute('aria-busy');
+  if (animate) {
+    const incoming = transition === 'language' ? root : page;
+    const className = transition === 'language' ? 'slide-in' : 'page-enter';
+    incoming.classList.add(className);
+    window.setTimeout(() => incoming.classList.remove(className), 560);
+  }
+}
+
+async function render(transition: 'none' | 'page' | 'language' = 'none') {
   const version = ++renderVersion;
   document.documentElement.lang = language;
-  root.replaceChildren(header(), el('main', 'loading', language === 'es' ? 'Cargando artículos…' : 'Loading articles…'), footer());
+  root.setAttribute('aria-busy', 'true');
+  if (!root.hasChildNodes()) root.replaceChildren(header(), el('main', 'loading', language === 'es' ? 'Cargando artículos…' : 'Loading articles…'));
   try {
     const path = location.pathname.match(/^\/blog\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i);
     const legacy = new URLSearchParams(location.search).get('post');
     const chromePromise = publicApi.chrome();
     const navPromise = publicApi.navbar();
     const brandPromise = publicApi.branding();
+    const footerPromise = publicApi.footer();
     let page: HTMLElement;
     if (path || legacy) {
-      const [post, chrome, nav, brand] = await Promise.all([
+      const [post, chrome, nav, brand, siteFooter] = await Promise.all([
         path ? publicApi.articleById(path[1]) : publicApi.legacyArticle(legacy!),
-        chromePromise, navPromise, brandPromise,
+        chromePromise, navPromise, brandPromise, footerPromise,
       ]);
       if (version !== renderVersion) return;
       navbar = nav;
       branding = brand;
+      footerContent = siteFooter;
+      blogChrome = chrome;
       if (legacy || location.pathname !== `/blog/${post.id}`) history.replaceState({}, '', `/blog/${post.id}`);
       page = articlePage(post, chrome);
     } else if (location.pathname === '/') {
-      const [posts, chrome, nav, brand] = await Promise.all([publicApi.list(), chromePromise, navPromise, brandPromise]);
+      const [posts, chrome, nav, brand, siteFooter] = await Promise.all([publicApi.list(), chromePromise, navPromise, brandPromise, footerPromise]);
       if (version !== renderVersion) return;
       navbar = nav;
       branding = brand;
+      footerContent = siteFooter;
+      blogChrome = chrome;
       page = listPage(posts, chrome);
     } else {
       throw new PublicApiError(404);
     }
     applyTheme();
-    root.replaceChildren(header(), page, footer());
+    await showPage(page, version, transition);
   } catch (error) {
     if (version !== renderVersion) return;
     const missing = error instanceof PublicApiError && error.status === 404;
@@ -333,6 +396,7 @@ async function render() {
     retry.onclick = () => void render();
     main.append(missing ? link(language === 'es' ? 'Ver artículos' : 'See articles', '/', 'button') : retry);
     root.replaceChildren(header(), main, footer());
+    root.removeAttribute('aria-busy');
   }
 }
 
@@ -353,8 +417,8 @@ document.addEventListener('click', (event) => {
   if (anchor.pathname + anchor.search !== location.pathname + location.search) {
     history.pushState({}, '', anchor.pathname + anchor.search + anchor.hash);
     window.scrollTo(0, 0);
-    void render();
+    void render('page');
   }
 });
-window.addEventListener('popstate', () => void render());
+window.addEventListener('popstate', () => void render('page'));
 void render();

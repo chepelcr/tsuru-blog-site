@@ -1,5 +1,5 @@
 import { AwsClient } from 'aws4fetch';
-import type { BlogChrome, BlogList, BlogPost, BrandingContent, NavbarContent } from './types';
+import type { BlogChrome, BlogList, BlogPost, BrandingContent, FooterContent, NavbarContent } from './types';
 
 const base = (import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/+$/, '');
 const pool = import.meta.env.VITE_PUBLIC_IDENTITY_POOL_ID || '';
@@ -54,4 +54,5 @@ export const publicApi = {
   chrome: async () => (await get<{ data: BlogChrome }>('/api/public/content/landing/blog-chrome')).data,
   navbar: async () => (await get<{ data: NavbarContent }>('/api/public/content/landing/navbar')).data,
   branding: async () => (await get<{ data: BrandingContent }>('/api/public/content/landing/branding')).data,
+  footer: async () => (await get<{ data: FooterContent }>('/api/public/content/landing/footer')).data,
 };

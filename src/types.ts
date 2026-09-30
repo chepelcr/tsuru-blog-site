@@ -40,3 +40,11 @@ export interface BrandingContent {
   adminLoginUrl: string;
   adminRegisterUrl: string;
 }
+export interface FooterContent {
+  brand: Localized;
+  description: Localized;
+  groups: Record<'product' | 'company' | 'legal', Localized>;
+  links: Record<'features' | 'plans' | 'fairs' | 'community' | 'examples' | 'about' | 'blog' | 'contact' | 'terms' | 'privacy' | 'cookies', Localized>;
+  copyright: Localized;
+  madeBy: { label: Localized; name: string; url: string; logoUrl: string };
+}
