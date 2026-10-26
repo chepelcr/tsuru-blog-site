@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
-      VITE_SITE_URL: ${{ github.ref_name == 'main' && 'https://tsuru.lat' || 'https://tsuru.jcampos.dev' }}
+      VITE_SITE_URL: ${{ github.ref_name == 'main' && 'https://www.tsuru.lat' || 'https://tsuru.jcampos.dev' }}
       VITE_BLOG_SITE_URL: ${{ github.ref_name == 'main' && 'https://blogs.tsuru.lat' || 'https://blogs.tsuru.jcampos.dev' }}
     steps:
       - uses: actions/checkout@v4
