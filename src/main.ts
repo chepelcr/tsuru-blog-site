@@ -3,7 +3,9 @@ import type { BlogBlock, BlogChrome, BlogPost, BrandingContent, FooterContent, L
 import './style.css';
 
 const root = document.getElementById('app')!;
-const site = 'https://blogs.tsuru.jcampos.dev';
+// Each environment's build sets these (prod: *.tsuru.lat); defaults are dev's.
+const site = (import.meta.env.VITE_BLOG_SITE_URL || 'https://blogs.tsuru.jcampos.dev').replace(/\/+$/, '');
+const landing = (import.meta.env.VITE_SITE_URL || 'https://tsuru.jcampos.dev').replace(/\/+$/, '');
 const savedLanguage = localStorage.getItem('language') || localStorage.getItem('tsuru-blog-language');
 let language: Lang = savedLanguage === 'en' || savedLanguage === 'es'
   ? savedLanguage : navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en';
@@ -63,7 +65,7 @@ function icon(name: 'sun' | 'moon' | 'menu' | 'close' | 'chevron') {
 }
 
 function logo(label: string) {
-  const anchor = link('', 'https://tsuru.jcampos.dev/', 'brand-logo');
+  const anchor = link('', `${landing}/`, 'brand-logo');
   anchor.setAttribute('aria-label', label);
   if (branding?.logoUrl) {
     const light = el('img', 'logo-light');
@@ -119,14 +121,14 @@ function navLinks() {
     ['features', '/funcionalidades'], ['plans', '/planes'], ['fairs', '/ferias'],
     ['community', '/comunidad'], ['examples', '/ejemplos'],
   ];
-  for (const [key, path] of links) nav.append(link(pick(navbar.links[key]), `https://tsuru.jcampos.dev${path}`));
+  for (const [key, path] of links) nav.append(link(pick(navbar.links[key]), `${landing}${path}`));
   const about = el('details', 'nav-dropdown');
   const summary = el('summary', '', pick(navbar.links.nosotros));
   summary.append(icon('chevron'));
   about.append(summary, el('div', 'dropdown-menu'));
   about.lastElementChild!.append(
-    link(pick(navbar.links.about), 'https://tsuru.jcampos.dev/quienes-somos'),
-    link(pick(navbar.links.contact), 'https://tsuru.jcampos.dev/contacto'),
+    link(pick(navbar.links.about), `${landing}/quienes-somos`),
+    link(pick(navbar.links.contact), `${landing}/contacto`),
   );
   nav.append(about, link(pick(navbar.links.blog), '/', 'current'));
   return nav;
@@ -190,7 +192,7 @@ function footer() {
   for (const group of groups) {
     const column = el('div', 'footer-group');
     column.append(el('h2', '', pick(footerContent.groups[group.name])));
-    for (const [key, path] of group.links) column.append(link(pick(footerContent.links[key]), path === '/' ? '/' : `https://tsuru.jcampos.dev${path}`));
+    for (const [key, path] of group.links) column.append(link(pick(footerContent.links[key]), path === '/' ? '/' : `${landing}${path}`));
     columns.append(column);
   }
   inner.append(columns);
@@ -202,7 +204,7 @@ function footer() {
   studio.append(el('span', '', pick(footerContent.madeBy.label)));
   if (footerContent.madeBy.logoUrl) {
     const image = el('img');
-    image.src = new URL(footerContent.madeBy.logoUrl, 'https://tsuru.jcampos.dev').href;
+    image.src = new URL(footerContent.madeBy.logoUrl, landing).href;
     image.alt = footerContent.madeBy.name;
     image.loading = 'lazy';
     studio.append(image);

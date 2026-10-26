@@ -1,8 +1,11 @@
-name: Deploy blog to GitHub Pages
+name: Deploy blog
+
+# develop -> dev  -> GitHub Pages at blogs.tsuru.jcampos.dev
+# main    -> prod -> S3 + CloudFront at blogs.tsuru.lat (cloudformation/hosting.yml)
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
@@ -11,18 +14,42 @@ permissions:
   id-token: write
 
 concurrency:
-  group: blog-pages
+  group: blog-deploy-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VITE_PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
-      VITE_PUBLIC_IDENTITY_POOL_ID: ${{ vars.PUBLIC_IDENTITY_POOL_ID }}
-      VITE_AWS_REGION: ${{ vars.AWS_REGION }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+      VITE_SITE_URL: ${{ github.ref_name == 'main' && 'https://tsuru.lat' || 'https://tsuru.jcampos.dev' }}
+      VITE_BLOG_SITE_URL: ${{ github.ref_name == 'main' && 'https://blogs.tsuru.lat' || 'https://blogs.tsuru.jcampos.dev' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC, prod only)
+        if: env.ENVIRONMENT == 'prod'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PROD_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # The blog reads published posts through the same guest identity pool
+      # and public API as the landing, so it uses the landing's parameters.
+      - name: Resolve build configuration (SSM on prod, repo variables on dev)
+        run: |
+          set -euo pipefail
+          if [ "$ENVIRONMENT" = "prod" ]; then
+            base=/tsuru/prod/landing
+            get() { aws ssm get-parameter --name "$base/$1" --query Parameter.Value --output text; }
+            echo "VITE_PUBLIC_API_URL=$(get api/public-url)" >> "$GITHUB_ENV"
+            echo "VITE_PUBLIC_IDENTITY_POOL_ID=$(get cognito/public-identity-pool-id)" >> "$GITHUB_ENV"
+            echo "VITE_AWS_REGION=$(get aws/region)" >> "$GITHUB_ENV"
+          else
+            echo "VITE_PUBLIC_API_URL=${{ vars.PUBLIC_API_URL }}" >> "$GITHUB_ENV"
+            echo "VITE_PUBLIC_IDENTITY_POOL_ID=${{ vars.PUBLIC_IDENTITY_POOL_ID }}" >> "$GITHUB_ENV"
+            echo "VITE_AWS_REGION=${{ vars.AWS_REGION }}" >> "$GITHUB_ENV"
+          fi
       - uses: pnpm/action-setup@v4
         with:
           version: 11.24.0
@@ -34,9 +61,22 @@ jobs:
       - name: Build code only
         run: pnpm run build
       - uses: actions/upload-pages-artifact@v3
+        if: env.ENVIRONMENT == 'dev'
         with:
           path: dist
+      # prod: bucket and distribution are outputs of the tsuru-prod-blog-site-hosting
+      # stack (SiteBucketName / SiteDistributionId), stored as repo variables.
+      # Hashed assets are cached for a year; everything else revalidates.
+      - name: Publish to S3 + invalidate CloudFront
+        if: env.ENVIRONMENT == 'prod'
+        run: |
+          set -euo pipefail
+          bucket="s3://${{ vars.PROD_SITE_BUCKET }}"
+          aws s3 sync dist "$bucket" --delete --exclude "assets/*" --cache-control "no-cache"
+          aws s3 sync dist/assets "$bucket/assets" --delete --cache-control "public,max-age=31536000,immutable"
+          aws cloudfront create-invalidation --distribution-id "${{ vars.PROD_DISTRIBUTION_ID }}" --paths "/*" >/dev/null
   deploy:
+    if: github.ref_name == 'develop'
     needs: build
     runs-on: ubuntu-latest
     environment:
